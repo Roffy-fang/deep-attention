@@ -2,7 +2,7 @@ require 'nn'
 require 'nngraph'
 
 local LSTM = {}
-function LSTM.lstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, res_rnn, active,normalize, slstm, f_bias)
+function LSTM.lstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, res_rnn, normalize, slstm, f_bias)
   dropout_l = dropout_l or 0 
   dropout_t = dropout_t or 0 
 
@@ -16,8 +16,7 @@ function LSTM.lstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, r
   end
   local imgs = inputs[1]
   local x, input_size_L
-  local atten_h
-  local att_x
+  local atten_h 
   local outputs = {}
   for L = 1,n do
     -- c,h from previos timesteps
@@ -29,26 +28,15 @@ function LSTM.lstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, r
       x = inputs[2]
       input_size_L = input_size
     else 
-      if L == n then
-        att_x = att_x 
-               -nn.MulConstant(1/(n-1), true)
-      if dropout_l > 0 then att_x = nn.Dropout(dropout_l)(att_x):annotate{name='drop_l_' .. L} end -- apply dropout_l, if any
-        x = outputs[(L-1)*2] 
-      else  x = outputs[(L-1)*2] 
-      end 
+      x = outputs[(L-1)*2] 
       if dropout_l > 0 then x = nn.Dropout(dropout_l)(x):annotate{name='drop_l_' .. L} end -- apply dropout_l, if any
       input_size_L = rnn_size
     end
     -- evaluate the input sums at once for efficiency
     local i2h = nn.Linear(input_size_L, 4 * rnn_size)(x):annotate{name='i2h_'..L}
     local h2h = nn.Linear(rnn_size, 4 * rnn_size)(prev_h):annotate{name='h2h_'..L}
-    local all_input_sums
-    if L == n then 
-       local z2h = nn.Linear(rnn_size, 4 * rnn_size)(att_x):annotate{name='z2h_'..L}
-       all_input_sums = nn.CAddTable()({i2h,z2h, h2h})
-    else 
-       all_input_sums = nn.CAddTable()({i2h, h2h})
-    end
+    local all_input_sums = nn.CAddTable()({i2h, h2h})
+
     local reshaped = nn.Reshape(4, rnn_size)(all_input_sums)
     local n1, n2, n3, n4 = nn.SplitTable(2)(reshaped):split(4)
     n2 = nn.AddConstant(f_bias,true)(n2)
@@ -83,39 +71,29 @@ function LSTM.lstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, r
     end
     table.insert(outputs, next_h)
     
-    if L < n then 
+    if L == 1 then 
       atten_h = next_h 
-      if active == 0 then 
-       atten_h = {atten_h , imgs}
-                - nn.JoinTable(2)
-                - nn.Linear(rnn_size * 2, rnn_size)
-                - nn.SoftMax()
-      else 
-       atten_h = {atten_h , imgs}
-                - nn.JoinTable(2)
-                - nn.Linear(rnn_size * 2, rnn_size)
-                - nn.ReLU()
-     end
-    local xt = nn.CMulTable()({imgs, atten_h}):annotate{name='xt_imgs_'}
-      if L == 1 then
-        att_x = xt
-      else att_x = nn.CAddTable()({att_x, xt})
-      end 
     end 
 
   end
 
+  atten_h = {atten_h , imgs}
+          - nn.JoinTable(2)
+          - nn.Linear(rnn_size * 2, rnn_size)
+          - nn.SoftMax()
+  local xt = nn.CMulTable()({imgs, atten_h}):annotate{name='xt_imgs_'}
   -- set up the decoder
   local top_h = outputs[#outputs]
   if dropout_l > 0 then top_h = nn.Dropout(dropout_l)(top_h):annotate{name='drop_final'} end
-  local proj = nn.Linear(rnn_size, output_size)(top_h):annotate{name='decoder'}
+  local hhx = nn.CAddTable()({top_h, xt})
+  local proj = nn.Linear(rnn_size, output_size)(hhx):annotate{name='decoder'}
   local logsoft = nn.LogSoftMax()(proj)
   table.insert(outputs, logsoft)
 
   return nn.gModule(inputs, outputs)
 end
 
-function LSTM.clstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, res_rnn, active, normalize, slstm, f_bias)
+function LSTM.clstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, res_rnn, normalize, slstm, f_bias)
   dropout_l = dropout_l or 0 
   dropout_t = dropout_t or 0 
 
@@ -196,7 +174,7 @@ function LSTM.clstm(input_size, output_size, rnn_size, n, dropout_l, dropout_t, 
 
   return nn.gModule(inputs, outputs)
 end
-function LSTM.rnn(input_size, output_size, rnn_size, n, dropout_l, dropout_t, res_rnn,active, normalize)
+function LSTM.rnn(input_size, output_size, rnn_size, n, dropout_l, dropout_t, res_rnn, normalize)
   dropout_l = dropout_l or 0 
   dropout_t = dropout_t or 0 
 

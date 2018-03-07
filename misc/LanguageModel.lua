@@ -2,6 +2,7 @@ require 'nn'
 local utils = require 'misc.utils'
 local net_utils = require 'misc.net_utils'
 local LSTM = require 'misc.LSTM'
+local LSTM_Armour = require 'misc.LSTM_Armour'
 local GRU = require 'misc.GRU'
 local MUT = require 'misc.MUT'
 
@@ -22,27 +23,30 @@ function layer:__init(opt)
   local dropout_t = utils.getopt(opt, 'dropout_t', 0)
   local rnn_type = utils.getopt(opt, 'rnn_type', 'lstm')
   local res_rnn = utils.getopt(opt, 'res_rnn', false)
+  local active = utils.getopt(opt, 'active', 0)
+  self.att_size = utils.getopt(opt, 'attention_size', 512)
   -- options for Language Model
   self.seq_length = utils.getopt(opt, 'seq_length')
   -- create the core lstm network. note +1 for both the START and END tokens
   if rnn_type == 'lstm' then
-    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 0, false, 0)
+   -- self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn,active, 0, false, 0)
+   self.core = LSTM_Armour.lstm(self.input_encoding_size, self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.att_size, self.num_layers, dropout_l)
   elseif rnn_type == 'rnn' then
-    self.core = LSTM.rnn(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 0)
+    self.core = LSTM.rnn(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, active, 0)
   elseif rnn_type == 'lstmb' then
-    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 0, false, 1)
+    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn,active, 0, false, 1)
   elseif rnn_type == 'clstm' then
-    self.core = LSTM.clstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 0, false, 1)
+    self.core = LSTM.clstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn,active, 0, false, 1)
   elseif rnn_type == 'slstm' then
-    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 0, true, 1)
+    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn,active, 0, true, 1)
   elseif rnn_type == 'nlstm' then
-    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 2, true, 0)
+    self.core = LSTM.lstm(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, active,2, true, 0)
   elseif rnn_type == 'gru' then
-    self.core = GRU.gru(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, 0)
+    self.core = GRU.gru(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn,active,  0)
   elseif rnn_type == 'mut1' then
-    self.core = MUT.mut1(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn)
+    self.core = MUT.mut1(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn,active)
   elseif rnn_type == 'mut3' then
-    self.core = MUT.mut3(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn)
+    self.core = MUT.mut3(self.input_encoding_size, self.vocab_size + 1, self.rnn_size, self.num_layers, dropout_l, dropout_t, res_rnn, active)
   else
     assert(1==0, 'unsupport rnn type')
   end
@@ -120,12 +124,13 @@ Careful: make sure model is in :evaluate() mode if you're calling this.
 Returns: a DxN LongTensor with integer elements 1..M, 
 where D is sequence length and N is batch (so columns are sequences)
 --]]
-function layer:sample(imgs, opt)
+function layer:sample(inputs, opt)
   local sample_max = utils.getopt(opt, 'sample_max', 1)
   local beam_size = utils.getopt(opt, 'beam_size', 1)
   local temperature = utils.getopt(opt, 'temperature', 1.0)
-  if sample_max == 1 and beam_size > 1 then return self:sample_beam(imgs, opt) end -- indirection for beam search
-
+  if sample_max == 1 and beam_size > 1 then return self:sample_beam(inputs, opt) end -- indirection for beam search
+  local imgs = inputs[2]
+  local img_x = inputs[1]
   local batch_size = imgs:size(1)
   self:_createInitState(batch_size)
   local state = self.init_state
@@ -171,7 +176,7 @@ function layer:sample(imgs, opt)
       seqLogprobs[t-2] = sampleLogprobs:view(-1):float() -- and also their log likelihoods
     end
 
-    local inputs = {xt,unpack(state)}
+    local inputs = {img_x,xt,unpack(state)}
     local out = self.core:forward(inputs)
     logprobs = out[self.num_state+1] -- last element is the output vector
     state = {}
@@ -188,11 +193,13 @@ Not 100% sure it's correct, and hard to fully unit test to satisfaction, but
 it seems to work, doesn't crash, gives expected looking outputs, and seems to 
 improve performance, so I am declaring this correct.
 ]]--
-function layer:sample_beam(imgs, opt)
-  local beam_size = utils.getopt(opt, 'beam_size', 10)
+function layer:sample_beam(input, opt)
+  local beam_size = utils.getopt(opt, 'beam_size', 10) 
+  local imgs = input[2]
+  local img_x =input[1]
   local batch_size, feat_dim = imgs:size(1), imgs:size(2)
+  local feat_h,feat_w =  img_x:size(3), img_x:size(4) 
   local function compare(a,b) return a.p > b.p end -- used downstream
-
   assert(beam_size <= self.vocab_size+1, 'lets assume this for now, otherwise this corner case causes a few headaches down the road. can be dealt with in future if needed')
 
   local seq = torch.LongTensor(self.seq_length, batch_size):zero()
@@ -203,7 +210,7 @@ function layer:sample_beam(imgs, opt)
     -- create initial states for all beams
     self:_createInitState(beam_size)
     local state = self.init_state
-
+    local img_xt
     -- we will write output predictions into tensor seq
     local beam_seq = torch.LongTensor(self.seq_length, beam_size):zero()
     local beam_seq_logprobs = torch.FloatTensor(self.seq_length, beam_size):zero()
@@ -218,7 +225,10 @@ function layer:sample_beam(imgs, opt)
         -- feed in the images
         local imgk = imgs[{ {k,k} }]:expand(beam_size, feat_dim) -- k'th image feature expanded out
         xt = imgk
-      elseif t == 2 then
+        img_xt = img_x[{ {k,k} }]:expand(beam_size, feat_dim, feat_h, feat_w) -- k'th image feature expanded out
+        img_xt =  img_xt:contiguous()
+        xt =  xt:contiguous() 
+     elseif t == 2 then
         -- feed in the start tokens
         it = torch.LongTensor(beam_size):fill(self.vocab_size+1)
         xt = self.lookup_table:forward(it)
@@ -287,7 +297,7 @@ function layer:sample_beam(imgs, opt)
 
       if new_state then state = new_state end -- swap rnn state, if we reassinged beams
 
-      local inputs = {xt,unpack(state)}
+      local inputs = {img_xt,xt,unpack(state)}
       local out = self.core:forward(inputs)
       logprobs = out[self.num_state+1] -- last element is the output vector
       state = {}
@@ -314,8 +324,9 @@ next token at every iteration of the LSTM (+2 because +1 for first dummy
 img forward, and another +1 because of START/END tokens shift)
 --]]
 function layer:updateOutput(input)
-  local imgs = input[1]
-  local seq = input[2]
+  local imgs = input[2]
+  local seq = input[3]
+  local img_x = input[1]
   if self.clones == nil then self:createClones() end -- lazily create clones on first forward pass
 
   assert(seq:size(1) == self.seq_length)
@@ -365,7 +376,7 @@ function layer:updateOutput(input)
 
     if not can_skip then
       -- construct the inputs
-      self.inputs[t] = {xt,unpack(self.state[t-1])}
+      self.inputs[t] = {img_x, xt,unpack(self.state[t-1])}
       -- forward the network
       local out = self.clones[t]:forward(self.inputs[t])
       -- process the outputs
@@ -384,7 +395,7 @@ gradOutput is an (D+2)xNx(M+1) Tensor.
 --]]
 function layer:updateGradInput(input, gradOutput)
   local dimgs -- grad on input images
-
+  local dimg_x = nil 
   -- go backwards and lets compute gradients
   local dstate = {[self.tmax] = self.init_state} -- this works when init_state is all zeros
   for t=self.tmax,1,-1 do
@@ -394,21 +405,27 @@ function layer:updateGradInput(input, gradOutput)
     table.insert(dout, gradOutput[t])
     local dinputs = self.clones[t]:backward(self.inputs[t], dout)
     -- split the gradient to xt and to state
-    local dxt = dinputs[1] -- first element is the input vector
+    if t == self.tmax then
+       dimg_x = dinputs[1] -- first element is the input vector
+    else
+       dimg_x = dimg_x + dinputs[1]
+    end
+    local dxt = dinputs[2] -- first element is the input vector
     dstate[t-1] = {} -- copy over rest to state grad
-    for k=2,self.num_state+1 do table.insert(dstate[t-1], dinputs[k]) end
+    for k=3,self.num_state+2 do table.insert(dstate[t-1], dinputs[k]) end
     
     -- continue backprop of xt
     if t == 1 then
-      dimgs = dxt
+      dimgs =  dxt
     else
       local it = self.lookup_tables_inputs[t]
       self.lookup_tables[t]:backward(it, dxt) -- backprop into lookup table
     end
   end
-
+  --TODO 
+ -- dimg_x = dimg_x 
   -- we have gradient on image, but for LongTensor gt sequence we only create an empty tensor - can't backprop
-  self.gradInput = {dimgs, torch.Tensor()}
+  self.gradInput = {dimg_x, dimgs, torch.Tensor()}
   return self.gradInput
 end
 

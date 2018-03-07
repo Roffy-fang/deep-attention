@@ -10,17 +10,28 @@ function net_utils.build_cnn(cnn, opt)
   local cnn_outsize = utils.getopt(opt, 'cnn_outsize', 2048)
   
   local cnn_part = cnn
+  local fc = nn.Sequential()
+ -- fc:add(cnn_part.modules[#cnn_part.modules-cnn_remove+1]) 
+ -- fc:add(cnn_part.modules[#cnn_part.modules-cnn_remove+2]) 
+ -- fc:add(cnn_part.modules[#cnn_part.modules-cnn_remove+3]) 
+  
   for _=1,cnn_remove do
     cnn_part:remove(#cnn_part.modules)
   end
-
-  cnn_part:add(nn.Linear(cnn_outsize,encoding_size))
+  cnn_part:add(nn.SpatialConvolution(cnn_outsize, encoding_size, 1, 1))
   cnn_part:add(nn.ReLU(true))
-  
+
+
+  fc:add(nn.SpatialAveragePooling(7,7,1,1))
+  fc:add(nn.View(encoding_size))
+  fc:add(nn.Linear(encoding_size,encoding_size))
+  fc:add(nn.ReLU(true))
+
   if backend == 'cudnn' then
     cudnn.convert(cnn_part, cudnn)
+    cudnn.convert(fc, cudnn)
   end
-  return cnn_part
+  return {cnn_part,fc}
 end
 
 -- takes a batch of images and preprocesses them
@@ -62,12 +73,18 @@ end
 function layer:updateOutput(input)
   if self.n == 1 then self.output = input; return self.output end -- act as a noop for efficiency
   -- simply expands out the features. Performs a copy information
-  assert(input:nDimension() == 2)
-  local d = input:size(2)
-  self.output:resize(input:size(1)*self.n, d)
+ -- assert(input:nDimension() == 2)
+ local size_out = input:size()
+ local size_o = {}
+ for i = 1, size_out:size() do
+   table.insert(size_o, size_out[i])
+  end
+  size_o[1] =size_o[1] * self.n
+  self.output:resize(unpack(size_o))
+  size_o[1] = self.n
   for k=1,input:size(1) do
     local j = (k-1)*self.n+1
-    self.output[{ {j,j+self.n-1} }] = input[{ {k,k}, {} }]:expand(self.n, d) -- copy over
+    self.output[{ {j,j+self.n-1} }] = input[{ {k,k} }]:expand(unpack(size_o)) -- copy over
   end
   return self.output
 end
