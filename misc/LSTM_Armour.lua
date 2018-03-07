@@ -212,40 +212,4 @@ function LSTM_Armour.Attention_Unit(hDim, xDim, aDim)
 	return nn.gModule(inputs, outputs)
 end 
 
--- make LSTM with attention mechannism of selecting from the image features set: x = {x_1, x_2, ..., x_L}
--- note that here  we just set input_size2 has to be  512, we will come to this and set it as a parameters 
--- in the future 
-function LSTM_Armour.LSTM_with_Attention(input_size1, input_size2, output_size, rnn_size, attSize, depth, dropout) 
-    dropout = dropout or 0
-	depth = depth or 1
-
-	assert(depth==1, 'currently only support 1 layer of LSTM') 
-  local inputs = {}
-  table.insert(inputs, nn.Identity()())
-  table.insert(inputs, nn.Identity()())
-  table.insert(inputs, nn.Identity()())
-  table.insert(inputs, nn.Identity()())
-	
-	local prev_c = inputs[3]	
-	local prev_h = inputs[4]
-
-	local word_vector = inputs[1]
-	local x = inputs[2]
-     -nn.View(rnn_size, -1):setNumInputDims(3)
-     -nn.Transpose({2, 3})
-    -- alignment 
-	local alpha = LSTM_Armour.Attention_Unit(rnn_size, input_size2, attSize)({prev_h, x})   
-
-    -- soft attention, glimpse
-	local g = LSTM_Armour.makeWeightedSumUnit()({x, alpha})  
-     
-    -- rnn is the output
-    -- currently input_size2 must be 512
-    local rnn = LSTM_Armour.lstm(input_size1, input_size2, output_size, rnn_size, depth, dropout)({word_vector, g, prev_c, prev_h})
-	 
-  local outputs = {}
-  table.insert(outputs,rnn)
-	return nn.gModule(inputs, outputs)
-end 
-
 return LSTM_Armour
