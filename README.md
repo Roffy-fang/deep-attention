@@ -1,15 +1,14 @@
 
-# NeuralTalk2 on ResNet
+# Deep-attention
 
 ### Before all
-This work is forked from fabulous [neuraltalk2](https://github.com/karpathy/neuraltalk2) from [karparthy](https://github.com/karpathy). I replace the part of VGG to ResNet from [fb.resnet.torch](https://github.com/facebook/fb.resnet.torch).
+This work is forked from fabulous [neuraltalk2](https://github.com/karpathy/neuraltalk2) from [karparthy](https://github.com/karpathy). And the model implemented here is from "Looking Deeper and Transferring Attention for Image Captioning"
 
-The only files I change are the [misc/net_utils.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/net_utils.lua), [misc/transforms.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/transforms.lua)(copy from [fb.resnet.torch](https://github.com/facebook/fb.resnet.torch)), and [train.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/train.lua)
+The files I change are the [misc/net_utils.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/net_utils.lua), [misc/transforms.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/transforms.lua)(copy from [fb.resnet.torch](https://github.com/facebook/fb.resnet.torch)), and [train.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/train.lua). Besides, we replace  [misc/LSTM.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/LSTM.lua) the with [misc/LSTM_Armour.lua](copy from .[attention-based-image-caption/src/misc/LSTM_Armour.lua](https://github.com/eriche2016/attention-based-image-caption/blob/master/src/misc/LSTM_Armour.lua)), which is also modified in our model.
 
-The rest of the readme is the same as the original project, just replace VGG with ResNet, then it's the same.
+The rest of the readme is the same as [neuraltalk2](https://github.com/karpathy/neuraltalk2), just replace VGG with ResNet, then it's the same.
 
 ---
-
 
 Recurrent Neural Network captions your images. Now much faster and better than the original [NeuralTalk](https://github.com/karpathy/neuraltalk). Compared to the original NeuralTalk this implementation is **batched, uses Torch, runs on a GPU, and supports CNN finetuning**. All of these together result in quite a large increase in training speed for the Language Model (~100x), but overall not as much because we also have to forward a VGGNet. However, overall very good models can be trained in 2-3 days, and they show a much better performance.
 
