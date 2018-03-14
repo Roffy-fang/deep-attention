@@ -6,6 +6,11 @@ This work is forked from fabulous [neuraltalk2](https://github.com/karpathy/neur
 
 The files I change are the [misc/net_utils.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/net_utils.lua), [misc/transforms.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/transforms.lua)(copy from [fb.resnet.torch](https://github.com/facebook/fb.resnet.torch)), and [train.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/train.lua). Besides, we replace [misc/LSTM.lua](https://github.com/ruotianluo/neuraltalk2_resnet/blob/master/misc/LSTM.lua) the with [misc/LSTM_Armour.lua](https://github.com/eriche2016/attention-based-image-caption/blob/master/src/misc/LSTM_Armour.lua)(copy from .[attention-based-image-caption](https://github.com/eriche2016/attention-based-image-caption/blob/master)), which is also modified in our model.
 
+### Overview 
+A deep attention based language model is proposed in this work to incorporate attention into deep LSTM networks for image captioning:
+![overview](https://github.com/Roffy-fang/deep-attention/blob/master/vis/Fig1.jpg)
+To achieve this, the current hidden state of the LSTM network is utilized with the corresponding feature map to obtain attention since the current hidden state is closer to the next predicted word. Moreover, when the predicted word is an abstract word such as an action or an attribute, attention can be adaptively located to the related object as the language model becomes deeper 
+
 The rest of the readme is the same as [neuraltalk2](https://github.com/karpathy/neuraltalk2), just replace VGG with ResNet, then it's the same.
 
 ---
