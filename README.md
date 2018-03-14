@@ -8,7 +8,7 @@ The files I change are the [misc/net_utils.lua](https://github.com/ruotianluo/ne
 
 ### Overview 
 A deep attention based language model is proposed in this work to incorporate attention into deep LSTM networks for image captioning:
-![overview](https:https://github.com/Roffy-fang/deep-attention/master/vis/Fig1.jpg)
+![overview](https://github.com/Roffy-fang/deep-attention/blob/master/vis/Fig1.jpg)
 To achieve this, the current hidden state of the LSTM network is utilized with the corresponding feature map to obtain attention since the current hidden state is closer to the next predicted word. Moreover, when the predicted word is an abstract word such as an action or an attribute, attention can be adaptively located to the related object as the language model becomes deeper 
 
 The rest of the readme is the same as [neuraltalk2](https://github.com/karpathy/neuraltalk2), just replace VGG with ResNet, then it's the same.
